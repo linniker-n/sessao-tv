@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="15">
+<meta name="sessao-build" content="16">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -977,6 +977,15 @@ const Nav={
     this.focus(el);
   }
 };
+/* DIAGNÓSTICO TEMPORÁRIO: registra teclas e mudanças de foco num painel no canto */
+const DBG={on:true,lines:[],t0:performance.now(),lastKey:0,box:null,
+  log(s){if(!this.on)return;const t=Math.round(performance.now()-this.t0);this.lines.push(t+' '+s);if(this.lines.length>16)this.lines.shift();
+    if(!this.box){this.box=document.createElement('pre');this.box.style.cssText='position:fixed;right:6px;bottom:6px;z-index:99999;margin:0;padding:8px 10px;background:rgba(0,0,0,.82);color:#7f7;font:13px/1.35 monospace;max-width:900px;white-space:pre;pointer-events:none;border:1px solid #3a3';document.body.append(this.box)}
+    this.box.textContent=this.lines.join('\n')},
+  desc(el){if(!el)return '-';return (el.className||'').replace(/\s+/g,'.').slice(0,18)+':'+((el.textContent||'').trim().slice(0,10))}};
+(function(){const f=Nav.focus.bind(Nav);Nav.focus=function(el){const b=Nav.cur;f(el);if(el&&el!==b){const dt=Math.round(performance.now()-DBG.lastKey);DBG.log((dt>150?'!! ':'   ')+'foco '+DBG.desc(el)+(dt>150?' (sem tecla, +'+dt+'ms) '+((new Error().stack||'').split('\n').slice(2,4).map(x=>x.trim().replace(/^at /,'').replace(/\(.*\//,'(').slice(0,40)).join(' < ')):''))}}})();
+addEventListener('keydown',e=>{DBG.lastKey=performance.now();DBG.log('v '+e.key+' '+e.keyCode+(e.repeat?' rep':''))},true);
+addEventListener('keyup',e=>{DBG.log('^ '+e.key+' '+e.keyCode)},true);
 function focusable(el,onEnter){el.setAttribute('data-f','');if(onEnter)el.onEnter=onEnter;return el}
 stage.addEventListener('click',e=>{
   const f=e.target.closest('[data-f]');if(!f||!Nav.scope().contains(f))return;
