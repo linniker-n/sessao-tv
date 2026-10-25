@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="11">
+<meta name="sessao-build" content="12">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -1674,10 +1674,17 @@ const Player={ctx:null,hideT:null,saveT:null};
     });
   };
   function subMenu(){
-    if(!Subs.list.length){toast(subAddons().length?'Nenhuma legenda encontrada para este título.':'Entre com sua conta Stremio para usar os addons de legenda.');return}
-    const cnt={};const opts=[['off','Desligada'],...Subs.list.slice(0,12).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;return [i,`${l} ${cnt[l]}`]})];
-    Menu.open(subB,opts,Subs.cur,val=>{if(val==='off'){clearSubs();toast('Legenda desligada.')}else loadSub(val)},{above:true});
+    /* legendas embutidas no arquivo (app da TV) + legendas dos addons */
+    let emb=[];if(NATIVE&&window.SessaoNative.textTracks){try{emb=JSON.parse(window.SessaoNative.textTracks())}catch(e){}}
+    if(!Subs.list.length&&!emb.length){toast(subAddons().length?'Nenhuma legenda encontrada para este título.':'Entre com sua conta Stremio para usar os addons de legenda.');return}
+    const cnt={};const opts=[['off','Desligada'],...emb.map(t=>['emb:'+t.i,t.label+' (do arquivo)']),...Subs.list.slice(0,12).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;return [i,`${l} ${cnt[l]}`]})];
+    Menu.open(subB,opts,Subs.cur,val=>{
+      if(NATIVE&&window.SessaoNative.selectText)window.SessaoNative.selectText(-1);
+      if(val==='off'){clearSubs();toast('Legenda desligada.')}
+      else if(String(val).startsWith('emb:')){clearSubs();Subs.cur=val;window.SessaoNative.selectText(+String(val).slice(4));toast('Legenda ativada.')}
+      else loadSub(val)},{above:true});
   }
+  window.__nativeCue=t=>{if(String(Subs.cur).startsWith('emb:'))subBox.innerHTML=esc(t||'').replace(/\n/g,'<br>')};
   function audioMenu(){
     const tr=Eng.audio();const c=Player.ctx;
     const ext=NATIVE&&c&&c.url?[['ext','Abrir em outro player (VLC, MX)']]:[];
