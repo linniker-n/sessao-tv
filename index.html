@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="9">
+<meta name="sessao-build" content="10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -364,6 +364,18 @@ html.native-play .layer:not(#player):not(#menu){visibility:hidden!important}
 .si span,.brand span{transition:opacity .15s}
 #dim{transition:opacity .22s}
 .hinfo.anim>*{animation-duration:.3s}
+/* ---------- v10: menu lateral sem itens se mexendo (só o fundo e o destaque animam) ---------- */
+#side{transform:none!important;width:120px;background:linear-gradient(90deg,rgba(0,0,0,.78),rgba(0,0,0,0))}
+#stage.nav-open #side{width:380px;background:none}
+#side::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#050507 0%,#050507 55%,rgba(5,5,7,0) 100%);opacity:0;transition:opacity .2s;pointer-events:none}
+#stage.nav-open #side::before{opacity:1}
+.sideinner{transform:none!important;position:relative}
+.si{width:76px;transition:color .12s;isolation:isolate;background:transparent!important;transform:none!important;box-shadow:none!important}
+.nav-open .si{width:316px}
+.si::before{content:"";position:absolute;inset:0;border-radius:14px;background:#fff;opacity:0;transform:scaleX(.25);transform-origin:left center;transition:opacity .12s,transform .2s cubic-bezier(.2,.9,.3,1);z-index:-1}
+.si.focused::before{opacity:1;transform:scaleX(1)}
+.si.focused{color:#0b0b10}
+.brand b img{width:48px;height:48px;border-radius:14px;display:block}
 </style>
 </head>
 <body>
@@ -1817,6 +1829,8 @@ $('#side').addEventListener('mouseleave',()=>stage.classList.toggle('nav-open',!
 /* botões de voltar para mouse */
 $$('.backbtn').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();back()}));
 $('#streams').addEventListener('click',e=>{if(e.target.id==='streams')back()});
+/* logo do app (vem junto do app da TV) */
+if(window.SessaoNative){const bm=$('.brand b');const li=new Image();li.onload=()=>{bm.innerHTML='';bm.style.background='none';bm.append(li)};li.src='file:///android_asset/brand.png'}
 
 /* ================= início ================= */
 (async function boot(){
