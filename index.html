@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="8">
+<meta name="sessao-build" content="9">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -1773,14 +1773,15 @@ function back(){
   if(Screens.cur!=='home'){Screens.show('home');return true}
   return false;
 }
-window.__onBack=()=>back();
+window.__onBack=()=>{const r=back();if(r)sfx('ok');return r};
 /* o app da TV baixou uma versão nova da interface: recarrega se a pessoa não estiver assistindo nada */
 window.__updateReady=()=>{if(Layers.top()||Player.ctx)return false;toast('Sessão atualizado. Recarregando...');setTimeout(()=>location.reload(),1500);return true};
 /* botão voltar do navegador e do mouse */
 try{history.pushState({sessao:1},'')}catch(e){}
 addEventListener('popstate',()=>{back();try{history.pushState({sessao:1},'')}catch(e){}});
 let lastMove=0;const moveQ=[];
-function queueMove(dir){Nav.move(dir)}
+function sfx(d){try{const B=window.SessaoNative;if(B&&B.sound)B.sound({up:1,down:2,left:3,right:4}[d]||0)}catch(e){}}
+function queueMove(dir){const b=Nav.cur;Nav.move(dir);if(Nav.cur!==b)sfx(dir)}
 function step(){const d=moveQ.shift();if(d)Nav.move(d);if(moveQ.length)requestAnimationFrame(step)}
 addEventListener('keydown',e=>{
   userMoved=true;
@@ -1796,8 +1797,8 @@ addEventListener('keydown',e=>{
     e.preventDefault();const now=performance.now();
     if(e.repeat&&now-lastMove<75)return;lastMove=now;queueMove(dirs[e.key]);return;
   }
-  if(isEnter){e.preventDefault();if(!e.repeat&&Nav.cur&&Nav.cur.onEnter)Nav.cur.onEnter();return}
-  if(isBack){e.preventDefault();back();return}
+  if(isEnter){e.preventDefault();if(!e.repeat&&Nav.cur&&Nav.cur.onEnter){sfx('ok');Nav.cur.onEnter()}return}
+  if(isBack){e.preventDefault();if(back())sfx('ok');return}
   if(Screens.cur==='search'&&!Layers.top()&&/^[a-z0-9]$/i.test(e.key)&&!e.metaKey&&!e.ctrlKey)Search.type(e.key.toLowerCase());
 });
 addEventListener('mousemove',()=>{if(Layers.is('player'))Player.show()});
