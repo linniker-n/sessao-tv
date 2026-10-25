@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="19">
+<meta name="sessao-build" content="20">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -1631,6 +1631,30 @@ Detail.open=async(it)=>{
 };
 
 /* ================= fontes (addons de streams) ================= */
+/* sincronia automática: acha o atraso (e a velocidade) da legenda que mais casa com os trechos de fala do áudio */
+function alignSubs(e,t0,step,cues){
+  const n=e.length;if(n<200)return null;
+  const srt=Array.from(e).sort((a,b)=>a-b),lo=srt[Math.floor(n*.15)],hi=srt[Math.floor(n*.95)];if(hi-lo<6)return null;
+  const thr=lo+.4*(hi-lo);const v=new Float32Array(n);for(let i=0;i<n;i++)v[i]=e[i]>thr?1:0;
+  /* junta pausas curtas dentro da mesma fala (até 0,3 s) */
+  for(let i=0,last=-1;i<n;i++){if(v[i]){if(last>=0&&i-last>1&&i-last<=15)for(let j=last+1;j<i;j++)v[j]=1;last=i}}
+  let m=0;for(let i=0;i<n;i++)m+=v[i];m/=n;const P=new Float64Array(n+1);for(let i=0;i<n;i++)P[i+1]=P[i]+(v[i]-m);
+  const t1=t0+n*step,R=25,sum=(a,b)=>{a=Math.max(0,Math.min(n,Math.round(a)));b=Math.max(0,Math.min(n,Math.round(b)));return b>a?P[b]-P[a]:0};
+  let best=null;
+  for(const k of [1,25000/23976,23976/25000]){
+    const cs=cues.map(c=>[c.s*k,c.e*k]).filter(c=>c[1]>t0-R&&c[0]<t1+R);if(cs.length<6)continue;
+    const sc=[];
+    for(let d=-R;d<=R+1e-9;d+=step){let x=0;for(const c of cs)x+=sum((c[0]+d-t0)/step,(c[1]+d-t0)/step);sc.push([x,d])}
+    let mu=0;sc.forEach(q=>mu+=q[0]);mu/=sc.length;let sd=0;sc.forEach(q=>sd+=(q[0]-mu)**2);sd=Math.sqrt(sd/sc.length)||1;
+    const top=sc.reduce((a,b)=>b[0]>a[0]?b:a);const z=(top[0]-mu)/sd;
+    /* o segundo melhor pico (longe do primeiro) mostra se a resposta é confiável */
+    const far=sc.filter(q=>Math.abs(q[1]-top[1])>1.5).reduce((a,b)=>b[0]>a[0]?b:a,[-1e9,0]);
+    const cand={k,d:Math.round(top[1]*100)/100,z,ratio:far[0]>0?top[0]/far[0]:9,cues:cs.length};
+    if(!best||cand.z>best.z*(k===1?1:1.08))best=cand;
+  }
+  if(best)best.ok=(best.z>=3.5&&best.ratio>=1.12)||(best.z>=2.5&&best.ratio>=1.5);
+  return best;
+}
 const Streams={ctx:null,tok:0};
 /* nota de cada fonte: link direto > áudio PT-BR > qualidade (4K > 1080p > 720p > 480p) > já em cache */
 function streamInfo(s){
@@ -1862,21 +1886,44 @@ const Player={ctx:null,hideT:null,saveT:null};
     }
     return false;
   };
-  const fmtD=d=>(d>0?'+':d<0?'−':'')+Math.abs(d).toFixed(2).replace(/\.?0+$/,'').replace(/^$/,'0')+' s';
+  const fmtD=d=>(d>0?'+':d<0?'−':'')+Math.abs(d).toFixed(2).replace(/0$/,'').replace(/\.0$/,'').replace(/^$/,'0')+' s';
+  function autoSync(){
+    const B=window.SessaoNative,c=Player.ctx;
+    if(!(NATIVE&&B&&B.speechMap)){toast('A sincronia automática precisa do app da TV na versão 1.2.0. Rode o instalar-na-tv.bat.',6000);return}
+    if(typeof Subs.cur!=='number'||!Subs.cues.length){toast('Escolha uma legenda primeiro.');return}
+    if(!c||!c.url){toast('Não achei o endereço do vídeo.');return}
+    const now=Eng.time(),from=Math.max(0,now-50),dur=110,tok=Subs.syncTok=(Subs.syncTok||0)+1,which=Subs.cur;
+    let lang='';try{const a=Eng.audio()||[];const on=a.find(t=>t.on);lang=(on&&on.lang)||''}catch(e){}
+    toast('Sincronizando a legenda com a fala do filme…',5000);
+    window.__speech=r=>{
+      if(tok!==Subs.syncTok||Subs.cur!==which)return;
+      if(!r||!r.ok){toast('Não consegui ouvir o áudio deste arquivo'+(r&&r.err?' ('+r.err+')':'')+'. Use o ajuste manual.',6000);return}
+      const bin=atob(r.e),e=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)e[i]=bin.charCodeAt(i);
+      const res=alignSubs(e,r.start/1000,r.step/1000,Subs.cues);
+      console.log('[sync]',JSON.stringify(res));
+      if(!res||!res.ok){toast('Não tive certeza do ajuste neste trecho (pouca fala). Tente de novo numa cena com diálogo ou ajuste manualmente.',6500);return}
+      if(res.k!==1)Subs.cues.forEach(q=>{q.s*=res.k;q.e*=res.k});
+      Subs.delay=res.d;lastCue=undefined;renderSub();
+      toast('Legenda sincronizada'+(res.d?' ('+fmtD(res.d)+')':'')+'.',3500);
+    };
+    try{B.speechMap(c.url,Math.round(from*1000),dur*1000,lang)}catch(e){toast('Não consegui iniciar a sincronia.')}
+  }
+  Player.autoSync=autoSync;
   function syncMenu(){
-    Menu.value(subB,{above:true,head:'Use ◀ ▶ para ajustar. Para a esquerda a legenda aparece antes, para a direita depois.',step:.25,
+    Menu.value(subB,{above:true,head:'Use ◀ ▶ para ajustar (0,1 s por toque). Para a esquerda a legenda aparece antes, para a direita depois.',step:.1,
       get:()=>Subs.delay,set:v=>{Subs.delay=Math.round(Math.max(-30,Math.min(30,v))*100)/100;lastCue=undefined;renderSub()},
-      fmt:d=>d?fmtD(d):'0 s (original)',extra:[['Voltar ao original',()=>{Subs.delay=0;lastCue=undefined;renderSub()}]]});
+      fmt:d=>d?fmtD(d):'0 s (original)',extra:[['Sincronizar automaticamente',()=>{Layers.pop();autoSync()}],['Voltar ao original',()=>{Subs.delay=0;lastCue=undefined;renderSub()}]]});
   }
   function subMenu(){
     /* legendas embutidas no arquivo (app da TV) + legendas dos addons */
     let emb=[];if(NATIVE&&window.SessaoNative.textTracks){try{emb=JSON.parse(window.SessaoNative.textTracks())}catch(e){}}
     if(!Subs.list.length&&!emb.length){toast(subAddons().length?'Nenhuma legenda encontrada para este título.':'Entre com sua conta Stremio para usar os addons de legenda.');return}
-    const cnt={};const ext=typeof Subs.cur==='number'?[['sync','Ajustar sincronia ('+(Subs.delay?fmtD(Subs.delay):'0 s')+')']]:[];
+    const cnt={};const ext=typeof Subs.cur==='number'?[['auto','Sincronizar automaticamente'],['sync','Ajustar manualmente ('+(Subs.delay?fmtD(Subs.delay):'0 s')+')']]:[];
     const opts=[['off','Desligada'],...ext,...emb.map(t=>['emb:'+t.i,t.label+' (do arquivo)']),...Subs.list.slice(0,40).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;const f=FMT((s.releaseFormat||'')+' '+(s.subtitleFileName||''));
       const tag=s.m==='h'?' · mesma versão':s._m>=150?' · combina com o vídeo':f?' · '+({bluray:'Blu-ray',web:'WEB',dvd:'DVD',tv:'TV'}[f]):'';return [i,`${l} ${cnt[l]}${tag}`]})];
     Menu.open(subB,opts,Subs.cur,val=>{
       if(val==='sync'){setTimeout(syncMenu,30);return}
+      if(val==='auto'){autoSync();return}
       if(NATIVE&&window.SessaoNative.selectText)window.SessaoNative.selectText(-1);
       if(val==='off'){clearSubs();toast('Legenda desligada.')}
       else if(String(val).startsWith('emb:')){clearSubs();Subs.cur=val;window.SessaoNative.selectText(+String(val).slice(4));toast('Legenda ativada.')}
