@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="20">
+<meta name="sessao-build" content="22">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -1822,13 +1822,28 @@ const Player={ctx:null,hideT:null,saveT:null};
     try{
       const r=await fetch(s.url);if(!r.ok)throw 0;const buf=await r.arrayBuffer();let txt;
       try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
-      Subs.cues=parseCues(txt);Subs.cur=i;Subs.delay=0;lastCue=undefined;
+      Subs.cues=parseCues(txt);Subs.cur=i;Subs.delay=0;Subs.syncMsg='';lastCue=undefined;
       const c=Subs.ctx||Player.ctx||{},vf=srcFps([c.srcFile,c.srcDesc,c.srcName].join(' '));
       if(s.fpsMilli&&Math.abs(s.fpsMilli-vf)>300){const f=s.fpsMilli/vf;Subs.cues.forEach(q=>{q.s*=f;q.e*=f})}
       renderSub();
       if(!Subs.cues.length)throw 0;
       if(!silent)toast('Legenda ativada.');
-    }catch(e){Subs.cues=[];Subs.cur='off';if(!silent)toast('Não consegui carregar essa legenda. Tente outra.')}
+      return true;
+    }catch(e){Subs.cues=[];Subs.cur='off';if(!silent)toast('Não consegui carregar essa legenda. Tente outra.');return false}
+  }
+  /* a última fala da legenda tem que terminar perto do fim do vídeo; senão ela é de outra versão (estendida, cortada...) */
+  const fitsVideo=()=>{const d=Eng.dur();if(!d||!Subs.cues.length)return null;const last=Subs.cues[Subs.cues.length-1].e;return last<=d+30&&last>=d*.78};
+  async function autoPick(tok){
+    const cand=Subs.list.map((s,i)=>i).filter(i=>isPT(Subs.list[i].lang)).slice(0,6);let first=-1;
+    for(const i of cand){
+      if(tok!==Subs.tok)return;const sb=Subs.list[i];if(!sb)return;
+      if(!(await loadSub(i,true)))continue;if(first<0)first=i;
+      for(let k=0;k<20&&!Eng.dur();k++)await new Promise(r=>setTimeout(r,500));
+      if(tok!==Subs.tok)return;
+      const ok=fitsVideo();console.log('[legendas] testando',sb.subtitleFileName||i,'cabe no vídeo:',ok);
+      if(ok!==false)return;
+    }
+    if(first>=0&&tok===Subs.tok)await loadSub(first,true);
   }
   const clearSubs=()=>{Subs.cues=[];Subs.cur='off';subBox.innerHTML='';lastCue=null};
   const ptRank=l=>/^(pob|ptb|pt-?br)$/i.test(l||'')?2:isPT(l)?1:0;
@@ -1839,12 +1854,14 @@ const Player={ctx:null,hideT:null,saveT:null};
   function subScore(sb,ctx){
     const src=[ctx.srcFile,ctx.srcDesc,ctx.srcName].filter(Boolean).join(' ');
     const name=[sb.subtitleFileName,sb.movieReleaseName].filter(Boolean).join(' ');
-    let sc=ptRank(sb.lang)*1000;if(!src)return sc;
+    const base=l=>ptRank(l)?1000+(ptRank(l)===2?120:0):0;let sc=base(sb.lang);if(!src)return sc;
     if(sb.m==='h')sc+=500;
     if(sb.releaseGroup&&new RegExp('\\b'+sb.releaseGroup.replace(/[^\w-]/g,'')+'\\b','i').test(src))sc+=200;
     const a=TOK(src),b=TOK(name);let k=0;b.forEach(w=>{if(a.has(w))k++});sc+=Math.min(150,k*15);
     const fs=FMT(src),fb=FMT((sb.releaseFormat||'')+' '+name);if(fs&&fb)sc+=fs===fb?80:-40;
     if(sb.fpsMilli){const d=Math.abs(sb.fpsMilli-srcFps(src));sc+=d<100?40:-60}
+    const CUT=/\b(dc|director'?s?[ ._-]?cut|extended|estendid[ao]|uncut|unrated|imax|remastered)\b/i;
+    if(CUT.test(name)!==CUT.test(src))sc-=180;
     return sc;
   }
   Player.fetchSubs=async ctx=>{
@@ -1862,13 +1879,13 @@ const Player={ctx:null,hideT:null,saveT:null};
     if(tok!==Subs.tok)return;
     /* 2) PT-BR primeiro; dentro de cada idioma vale a ordem do addon (as feitas para este arquivo vêm antes) */
     const seen=new Set();
-    Subs.list=all.flat().filter(s=>s&&s.url&&!seen.has(s.url)&&seen.add(s.url)).map((s,i)=>{const sc=subScore(s,ctx);return {...s,_o:i,_sc:sc,_m:sc-ptRank(s.lang)*1000}}).sort((a,b)=>(b._sc-a._sc)||(a._o-b._o));
+    Subs.list=all.flat().filter(s=>s&&s.url&&!seen.has(s.url)&&seen.add(s.url)).map((s,i)=>{const sc=subScore(s,ctx);return {...s,_o:i,_sc:sc,_m:sc-(ptRank(s.lang)?1000+(ptRank(s.lang)===2?120:0):0)}}).sort((a,b)=>(b._sc-a._sc)||(a._o-b._o));
     Subs.hashed=!!hs;Subs.ctx=ctx;
     console.log('[legendas] hash',hs&&hs.hash,'| fonte',ctx.srcFile||ctx.srcDesc||'-','| top',Subs.list.slice(0,3).map(x=>x.lang+':'+x._sc+':'+(x.subtitleFileName||'')).join(' ; '));
     /* 3) se o próprio arquivo tem legenda em português embutida, ela é a mais sincronizada de todas */
     if(store.get('subAuto',true)){
       if(await embeddedPT(tok))return;
-      const i=Subs.list.findIndex(s=>isPT(s.lang));if(i>=0)loadSub(i,true)}
+      await autoPick(tok)}
   };
   async function embeddedPT(tok){
     if(!NATIVE||!window.SessaoNative.textTracks)return false;
@@ -1892,15 +1909,21 @@ const Player={ctx:null,hideT:null,saveT:null};
     if(!(NATIVE&&B&&B.speechMap)){toast('A sincronia automática precisa do app da TV na versão 1.2.0. Rode o instalar-na-tv.bat.',6000);return}
     if(typeof Subs.cur!=='number'||!Subs.cues.length){toast('Escolha uma legenda primeiro.');return}
     if(!c||!c.url){toast('Não achei o endereço do vídeo.');return}
-    const now=Eng.time(),from=Math.max(0,now-50),dur=110,tok=Subs.syncTok=(Subs.syncTok||0)+1,which=Subs.cur;
+    const now=Eng.time(),from=Math.max(0,now-45),dur=80,tok=Subs.syncTok=(Subs.syncTok||0)+1,which=Subs.cur;
     let lang='';try{const a=Eng.audio()||[];const on=a.find(t=>t.on);lang=(on&&on.lang)||''}catch(e){}
-    toast('Sincronizando a legenda com a fala do filme…',5000);
+    toast('Sincronizando a legenda com a fala do filme…',5000);Subs.syncMsg='analisando…';const t0=Date.now();
+    console.log('[sync] inicio',Math.round(from),'s');
     window.__speech=r=>{
+      console.log('[sync] audio',r&&r.ok,r&&r.err,r&&r.e&&r.e.length,'em',Date.now()-t0,'ms');
       if(tok!==Subs.syncTok||Subs.cur!==which)return;
-      if(!r||!r.ok){toast('Não consegui ouvir o áudio deste arquivo'+(r&&r.err?' ('+r.err+')':'')+'. Use o ajuste manual.',6000);return}
-      const bin=atob(r.e),e=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)e[i]=bin.charCodeAt(i);
-      const res=alignSubs(e,r.start/1000,r.step/1000,Subs.cues);
+      if(!r||!r.ok){Subs.syncMsg='erro';toast('Não consegui ouvir o áudio deste arquivo'+(r&&r.err?' ('+r.err+')':'')+'. Use o ajuste manual.',6000);return}
+      const dec=b64=>{const bin=atob(b64),e=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)e[i]=bin.charCodeAt(i);return e};
+      const t0s=r.start/1000,st=r.step/1000;
+      console.log('[sync-raw]'+JSON.stringify({start:t0s,step:st,e:r.e,b:r.b||'',cues:Subs.cues.filter(q=>q.e>t0s-40&&q.s<t0s+st*(r.e.length*.75)+40).map(q=>[+q.s.toFixed(2),+q.e.toFixed(2)])}));
+      const cands=[alignSubs(dec(r.e),t0s,st,Subs.cues)];if(r.b)cands.push(alignSubs(dec(r.b),t0s,st,Subs.cues));
+      const res=cands.filter(Boolean).sort((a,b)=>(b.ok-a.ok)||(b.z-a.z))[0]||null;
       console.log('[sync]',JSON.stringify(res));
+      Subs.syncMsg=res&&res.ok?(res.d?fmtD(res.d):'já estava certa'):'sem certeza';
       if(!res||!res.ok){toast('Não tive certeza do ajuste neste trecho (pouca fala). Tente de novo numa cena com diálogo ou ajuste manualmente.',6500);return}
       if(res.k!==1)Subs.cues.forEach(q=>{q.s*=res.k;q.e*=res.k});
       Subs.delay=res.d;lastCue=undefined;renderSub();
@@ -1910,15 +1933,15 @@ const Player={ctx:null,hideT:null,saveT:null};
   }
   Player.autoSync=autoSync;
   function syncMenu(){
-    Menu.value(subB,{above:true,head:'Use ◀ ▶ para ajustar (0,1 s por toque). Para a esquerda a legenda aparece antes, para a direita depois.',step:.1,
+    Menu.value(subB,{above:true,head:'Use ◀ ▶ para ajustar de 0,1 em 0,1 s. Para a esquerda a legenda aparece antes, para a direita depois.',step:.1,
       get:()=>Subs.delay,set:v=>{Subs.delay=Math.round(Math.max(-30,Math.min(30,v))*100)/100;lastCue=undefined;renderSub()},
-      fmt:d=>d?fmtD(d):'0 s (original)',extra:[['Sincronizar automaticamente',()=>{Layers.pop();autoSync()}],['Voltar ao original',()=>{Subs.delay=0;lastCue=undefined;renderSub()}]]});
+      fmt:d=>d?fmtD(d):'0 s (original)',extra:[['Adiantar 1 s',()=>{Subs.delay=Math.round((Subs.delay-1)*100)/100;lastCue=undefined;renderSub()}],['Atrasar 1 s',()=>{Subs.delay=Math.round((Subs.delay+1)*100)/100;lastCue=undefined;renderSub()}],['Voltar ao original',()=>{Subs.delay=0;lastCue=undefined;renderSub()}]]});
   }
   function subMenu(){
     /* legendas embutidas no arquivo (app da TV) + legendas dos addons */
     let emb=[];if(NATIVE&&window.SessaoNative.textTracks){try{emb=JSON.parse(window.SessaoNative.textTracks())}catch(e){}}
     if(!Subs.list.length&&!emb.length){toast(subAddons().length?'Nenhuma legenda encontrada para este título.':'Entre com sua conta Stremio para usar os addons de legenda.');return}
-    const cnt={};const ext=typeof Subs.cur==='number'?[['auto','Sincronizar automaticamente'],['sync','Ajustar manualmente ('+(Subs.delay?fmtD(Subs.delay):'0 s')+')']]:[];
+    const cnt={};const ext=typeof Subs.cur==='number'?[['sync','Ajustar sincronia ('+(Subs.delay?fmtD(Subs.delay):'0 s')+')']]:[];
     const opts=[['off','Desligada'],...ext,...emb.map(t=>['emb:'+t.i,t.label+' (do arquivo)']),...Subs.list.slice(0,40).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;const f=FMT((s.releaseFormat||'')+' '+(s.subtitleFileName||''));
       const tag=s.m==='h'?' · mesma versão':s._m>=150?' · combina com o vídeo':f?' · '+({bluray:'Blu-ray',web:'WEB',dvd:'DVD',tv:'TV'}[f]):'';return [i,`${l} ${cnt[l]}${tag}`]})];
     Menu.open(subB,opts,Subs.cur,val=>{
