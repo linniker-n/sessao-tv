@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="7">
+<meta name="sessao-build" content="8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -31,7 +31,7 @@ img{user-select:none;-webkit-user-drag:none}
   background:linear-gradient(135deg,var(--accent),var(--accent2));font:800 28px var(--fh);color:#160700}
 .brand span,.si span{opacity:0;transition:opacity .2s}
 .brand span{font:700 34px var(--fh);letter-spacing:-.5px}
-.si{display:flex;align-items:center;gap:24px;height:68px;margin:0 22px 8px;padding:0 20px;border-radius:14px;width:76px;
+.si{display:flex;align-items:center;gap:24px;height:68px;margin:0 22px 8px;padding:0 20px;border-radius:14px;width:316px;
   color:#8d8d9a;white-space:nowrap;overflow:hidden;position:relative;transition:width .28s var(--ease),background .15s,color .15s}
 .nav-open .si{width:316px}
 .si svg{flex:0 0 34px;width:34px;height:34px}
@@ -348,6 +348,22 @@ html.native-play .layer:not(#player):not(#menu){visibility:hidden!important}
 .sapanel .pbg{position:absolute;left:-4%;top:-4%;width:108%;height:108%;filter:none;opacity:0;transition:opacity .8s}
 .sapanel .pbg.on{opacity:.75}
 #side,.sideinner,.si{transition-duration:.38s;transition-timing-function:cubic-bezier(.32,.72,.2,1)}
+/* ---------- v8: mais rápido (transições curtas, sem sombras animadas) ---------- */
+.rows{transition:transform .26s cubic-bezier(.25,.8,.25,1)}
+.track{transition:transform .2s cubic-bezier(.25,.8,.25,1)}
+.grid,.slist{transition:transform .2s cubic-bezier(.25,.8,.25,1)}
+.card,.pc,.ep{transition:transform .14s cubic-bezier(.2,.9,.3,1.1)}
+.card,.card.focused{box-shadow:none}
+.card::after,.pc .pi::after,.ep .th::after{transition:opacity .1s}
+.btn,.chip,.key,.si,.pb2,.pa,.dd,.src,.mi{transition:transform .14s cubic-bezier(.2,.9,.3,1.1),background-color .1s,color .1s}
+.btn.focused,.pa.focused,.dd.focused,.key.focused,.chip.focused,.pb2.focused{box-shadow:none}
+.layer{transition:opacity .16s,transform .2s cubic-bezier(.2,.9,.3,1),visibility 0s .2s}
+#streams .drawer{transition:transform .2s cubic-bezier(.2,.9,.3,1)}
+.bd img{transition:opacity .4s}
+#side,.sideinner{transition-duration:.22s}
+.si span,.brand span{transition:opacity .15s}
+#dim{transition:opacity .22s}
+.hinfo.anim>*{animation-duration:.3s}
 </style>
 </head>
 <body>
@@ -528,7 +544,7 @@ function norm(m,type){
 }
 function normT(r,mt){
   return {id:`tmdb:${mt}:${r.id}`,tmdb:r.id,type:mt==='tv'?'series':'movie',name:r.title||r.name||'',
-    poster:r.poster_path?TIMG+'w342'+r.poster_path:null,background:r.backdrop_path?TIMG+'w780'+r.backdrop_path:null,
+    poster:r.poster_path?TIMG+'w342'+r.poster_path:null,background:r.backdrop_path?TIMG+'w500'+r.backdrop_path:null,
     hero:r.backdrop_path?TIMG+'w1280'+r.backdrop_path:null,description:r.overview||'',
     releaseInfo:(r.release_date||r.first_air_date||'').slice(0,4),imdbRating:r.vote_average?r.vote_average.toFixed(1):null,
     genres:(r.genre_ids||[]).map(g=>TG[g]).filter(Boolean),pop:r.popularity,va:r.vote_average,date:r.release_date||r.first_air_date||''};
