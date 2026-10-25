@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="18">
+<meta name="sessao-build" content="19">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -480,7 +480,7 @@ html.native-play .layer:not(#player):not(#menu){visibility:hidden!important}
   <div class="layer" id="detail"></div>
   <div class="layer" id="streams"><div class="drawer"><h2>Escolha a fonte</h2><div class="sub"></div><div class="slistvp"><div class="slist" data-group="slist"></div></div></div></div>
   <div class="layer" id="player">
-    <video playsinline></video>
+    <video playsinline poster="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"></video>
     <div class="pwait"><div class="spin"></div></div>
     <div class="pctl"><div class="backbtn" title="Voltar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></div>
       <div class="ptop"><h2></h2><div></div></div>
@@ -1685,6 +1685,8 @@ $('.slist').onFocusIn=el=>{if(Streams.pf&&el!==Streams.pf)Streams.moved=true;con
 
 /* ================= player ================= */
 const NATIVE=!!(window.SessaoNative);
+/* no app da TV quem toca é o player nativo: o <video> da página nem aparece (evita a tela branca com play ao fechar) */
+if(NATIVE){const pv=document.querySelector('#player video');if(pv)pv.style.display='none'}
 const Player={ctx:null,hideT:null,saveT:null};
 (function(){
   const lay=$('#player'),v=$('video',lay),ctl=$('.pctl',lay),bar=$('.pbar',lay),btns=$('.pbtns',lay),fillI=$('.rail i',bar),knob=$('.rail b',bar),rail=$('.rail',bar);
