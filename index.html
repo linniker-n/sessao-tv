@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="16">
+<meta name="sessao-build" content="17">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -384,6 +384,12 @@ html.native-play .layer:not(#player):not(#menu){visibility:hidden!important}
 .key.focused{transform:scale(1.04)}.chip.focused,.pb2.focused{transform:scale(1.05)}
 .btn.focused,.pa.focused,.dd.focused{transform:scale(1.04)}
 #menu .menu{transition:transform .2s cubic-bezier(.25,.8,.25,1)}
+/* v17: no controle da TV o destaque troca na hora. A transição de cor fazia os dois botões ficarem cinza ao mesmo tempo
+   (parecia que o foco ia e voltava) e, apertando rápido, o destaque nunca chegava a aparecer */
+.btn,.chip,.key,.pb2,.pa,.dd,.src,.mi,.sg{transition:none!important}
+.btn *,.chip *,.key *,.pb2 *,.pa *,.dd *,.src *,.mi *,.sg *{transition:none!important}
+.key.focused{transform:none}.mi.focused,.sg.focused{transform:none}
+.chip.focused,.pb2.focused,.btn.focused,.pa.focused,.dd.focused{transform:scale(1.05)}
 .bd img{transition:opacity .4s}
 #side,.sideinner{transition-duration:.22s}
 .si span,.brand span{transition:opacity .15s}
