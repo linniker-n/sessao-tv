@@ -4,8 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="10">
+<meta name="sessao-build" content="11">
 <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://image.tmdb.org" crossorigin>
+<link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -332,7 +334,7 @@ html.native-play #main,html.native-play .layer:not(#player):not(#menu),html.nati
 .key.focused{transform:scale(1.07);box-shadow:0 16px 34px rgba(0,0,0,.42)}
 .chip.focused,.pb2.focused{transform:scale(1.1);box-shadow:0 14px 30px rgba(0,0,0,.35)}
 .bd img{transition:opacity .8s}
-.card img,.pc .pi img,.ep .th img{transition:opacity .3s}
+.card img,.pc .pi img,.ep .th img{transition:opacity .15s}
 .screen.active{animation:none}
 .layer{display:block;visibility:hidden;opacity:0;transform:scale(1.03);pointer-events:none;
   transition:opacity .24s,transform .3s cubic-bezier(.2,.9,.3,1),visibility 0s .3s}
@@ -497,7 +499,7 @@ function fit(){
 if(window.visualViewport)visualViewport.addEventListener('resize',fit);
 addEventListener('load',fit);[200,800,2000].forEach(t=>setTimeout(fit,t));
 addEventListener('resize',fit);fit();
-function img(src){const i=new Image();i.decoding='async';i.loading='lazy';i.alt='';i.addEventListener('load',()=>i.classList.add('ld'));i.src=src;return i}
+function img(src){const i=new Image();i.decoding='async';i.loading='eager';i.alt='';i.addEventListener('load',()=>i.classList.add('ld'));i.src=src;return i}
 
 const IC={
   search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
@@ -955,7 +957,7 @@ function makeCard(it,opts={}){
   const el=focusable(h('div',{class:'card'+(opts.cont?' cont':'')}));
   el.style.setProperty('--h',hash(it.id)%360);
   const bg=bgOf(it)||it.poster;
-  if(bg){const i=img(bg);i.onerror=()=>{if(!i.dataset.fb&&it.poster){i.dataset.fb=1;i.src=it.poster}else{i.remove();el.classList.add('noimg')}};el.append(i)}
+  if(bg){const i=opts.defer?(()=>{const x=img('');x.removeAttribute('src');x.dataset.src=bg;return x})():img(bg);i.onerror=()=>{if(!i.dataset.fb&&it.poster){i.dataset.fb=1;i.src=it.poster}else{i.remove();el.classList.add('noimg')}};el.append(i)}
   else el.classList.add('noimg');
   el.append(h('div',{class:'ct'},it.name));
   if(it.badge)el.append(h('div',{class:'cbadge'},it.badge));
@@ -998,14 +1000,18 @@ function RowsScreen(root,defs){
       if(tok!==scr.tok)return;
       setBackdrop(bd,it);setTitle(logo,it);setMeta(meta,it);desc.textContent=it.description||'';
       const hi=logo.parentElement;hi.classList.remove('anim');void hi.offsetWidth;hi.classList.add('anim');
-      if(!it.description&&MODE==='cine')getMeta(it).then(m=>{if(tok!==scr.tok)return;desc.textContent=m.description||'';setMeta(meta,{...it,...m,name:it.name})}).catch(()=>{});
-    },instant?0:240);
+      if(!it.description&&MODE!=='demo')getMeta(it).then(m=>{if(tok!==scr.tok)return;desc.textContent=m.description||'';setMeta(meta,{...it,...m,name:it.name})}).catch(()=>{});
+    },instant?0:120);
   };
   rows.onFocusIn=el=>{
     const row=el.closest('.row');if(!row)return;
     if(scr.curRow!==row){scr.curRow&&scr.curRow.classList.remove('cur');row.classList.add('cur');scr.curRow=row;place()}
     if(el.item)scr.setHero(el.item);
+    warmAround(row);
   };
+  /* carrega as capas da fileira atual e das vizinhas antes de chegar nelas */
+  const warm=r=>{if(r)$$('img[data-src]',r).forEach(i=>{i.src=i.dataset.src;i.removeAttribute('data-src')})};
+  function warmAround(row){warm(row);warm(row.previousElementSibling);let r=row.nextElementSibling;for(let k=0;k<3&&r;k++){warm(r);r=r.nextElementSibling}}
   function addRow(title,items,map,before){
     const track=h('div',{class:'track','data-group':''});bindTrack(track,STEP);
     items.forEach(it=>track.append(map?map(it):makeCard(it)));
@@ -1038,7 +1044,8 @@ function RowsScreen(root,defs){
       try{
         const items=(await fill(x.p,14)).slice(0,20);
         if(items.length<4){r.remove();place();return}
-        const t=$('.track',r);t.innerHTML='';items.forEach(it=>t.append(makeCard(it)));
+        const t=$('.track',r);t.innerHTML='';items.forEach(it=>t.append(makeCard(it,{defer:true})));
+        {const idx=[...rows.children].indexOf(r),ci=scr.curRow?[...rows.children].indexOf(scr.curRow):0;if(idx<=ci+3&&idx>=ci-1)warm(r)}
         if(!x.p.done||items.length>=20)t.append(focusable(h('div',{class:'card more',html:IC.arrow+'<span>Ver tudo</span>'}),()=>SeeAll.open(x.d)));
         if(i===0&&!heroSet){heroSet=true;scr.setHero(items[0],true)}
         if(Screens.curRoot()===root&&!userMoved&&!Layers.top()&&(!Nav.cur||!root.contains(Nav.cur)))Nav.focus(Screens.entry());
@@ -1057,7 +1064,11 @@ function setBackdrop(bd,it){
   next.decoding='async';
   next.onload=()=>{if(next.dataset.want!==src)return;(next.decode?next.decode():Promise.resolve()).catch(()=>{}).then(()=>{if(next.dataset.want!==src)return;next.classList.add('on');on&&on.classList.remove('on')})};
   next.onerror=()=>{if(next.dataset.want!==src)return;if(it.poster&&!next.dataset.fb){next.dataset.fb=1;next.src=it.poster}else imgs.forEach(i=>i.classList.remove('on'))};
-  next.dataset.fb='';next.dataset.want=src;next.src=src;
+  next.dataset.fb='';next.dataset.want=src;
+  /* mostra na hora a capa que já está carregada e troca pela grande quando chegar */
+  const lo=it.background&&it.background!==src?it.background:null;
+  next.src=lo||src;
+  if(lo){const pre=new Image();pre.decoding='async';pre.onload=()=>{(pre.decode?pre.decode():Promise.resolve()).catch(()=>{}).then(()=>{if(next.dataset.want===src)next.src=src})};pre.src=src}
 }
 function setTitle(box,it){
   box.innerHTML='';box.append(h('h1',null,it.name));box.dataset.id=it.id;
@@ -1097,11 +1108,15 @@ function buildScreens(){
   const top=mt=>({type:mt,path:`/${mt}/top_rated`,sort0:'rating',disc:{[mt]:{}}});
   const mixTrend={type:'mix',path:'/trending/all/day',paths:{movie:'/trending/movie/day',tv:'/trending/tv/day'},sort0:'trend',disc:{movie:{},tv:{}}};
   const mixBR={type:'mix',sort0:'trend',disc:{movie:{with_origin_country:'BR'},tv:{with_origin_country:'BR'}},min:{movie:30,tv:10}};
+  /* catálogos por streaming no Brasil (TMDB, onde cada título está disponível) */
+  const SV=[['Netflix','8'],['Disney+','337'],['Prime Video','119'],['Max','1899|384'],['Apple TV+','350'],['Globoplay','307'],['Paramount+','531']];
+  const svRows=types=>SV.flatMap(([n,id])=>types.map(mt=>R(`${n} · ${mt==='movie'?'Filmes':'Séries'}`,g(mt,{with_watch_providers:id,watch_region:'BR'},mt==='movie'?40:15),null)));
   Screens.map.home=RowsScreen($('#s-home'),[
     {special:'continue'},{special:'mylist'},
-    R('Em alta hoje',mixTrend,ci('movie','top')),
-    R('Filmes do momento',tr('movie'),null),
+    R('Filmes do momento',tr('movie'),ci('movie','top')),
     R('Séries do momento',tr('tv'),ci('series','top')),
+    ...svRows(['movie','tv']),
+    R('Em alta hoje',mixTrend,null),
     R('Produções brasileiras',mixBR,null),
     R('Aclamados pela crítica',top('movie'),ci('movie','imdbRating')),
     R('Ação e aventura',g('movie',{with_genres:'28|12',without_genres:'16,27,10751'}),ci('movie','top','Action',['Animation','Horror','Family'])),
@@ -1117,6 +1132,7 @@ function buildScreens(){
   Screens.map.home.onShow=()=>{const s=Screens.map.home;if(s.loaded)s.refreshSpecial()};
   Screens.map.movies=RowsScreen($('#s-movies'),[
     R('Filmes em alta',tr('movie'),ci('movie','top')),
+    ...svRows(['movie']),
     R('Nos cinemas',{type:'movie',path:'/movie/now_playing',params:{region:'BR'},sort0:'recent',disc:{movie:{}}},{type:'movie',cat:'year',extra:'genre='+Y}),
     R('Aclamados pela crítica',top('movie'),ci('movie','imdbRating')),
     R('Produções brasileiras',g('movie',{with_origin_country:'BR'},30),null),
@@ -1135,6 +1151,7 @@ function buildScreens(){
   ]);
   Screens.map.series=RowsScreen($('#s-series'),[
     R('Séries em alta',tr('tv'),ci('series','top')),
+    ...svRows(['tv']),
     R('No ar agora',{type:'tv',path:'/tv/on_the_air',sort0:'recent',disc:{tv:{}}},{type:'series',cat:'year',extra:'genre='+Y}),
     R('Aclamadas pela crítica',top('tv'),ci('series','imdbRating')),
     R('Séries brasileiras',g('tv',{with_origin_country:'BR'},10),null),
@@ -1608,6 +1625,7 @@ const Player={ctx:null,hideT:null,saveT:null};
   volB.onEnter=()=>{const x=Eng.vol();if(x>0){lastVol=x;Eng.setVol(0)}else Eng.setVol(lastVol||.8);paintVol()};
   volB.addEventListener('wheel',e=>{e.preventDefault();e.stopPropagation();volB.onKey(e.deltaY<0?'right':'left')},{passive:false});
   btns.append(volB,b10,pp,f10,nextB,audB,subB,srcB);
+  if(NATIVE)volB.style.display='none';
   lay._default=()=>pp;
   const seek=s=>{const d=Eng.dur();if(d)Eng.seek(Math.max(0,Math.min(d-1,Eng.time()+s)));show();paint()};
   const toggle=()=>{Eng.paused()?Eng.play():Eng.pause();show()};
