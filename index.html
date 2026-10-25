@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="13">
+<meta name="sessao-build" content="14">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -1144,6 +1144,13 @@ function buildScreens(){
   const HOTP={with_watch_providers:'8|337|119|1899|384|350|307|531',watch_region:'BR'};
   const hotP=mt=>mt==='movie'?{...HOTP,without_genres:'16','primary_release_date.gte':ago(730)}:{...HOTP,without_genres:'16,10762','air_date.gte':ago(150)};
   const hot=mt=>({type:mt,sort0:'trend',disc:{[mt]:hotP(mt)},min:{[mt]:mt==='movie'?40:15}});
+  /* fileiras próprias para o que fica fora do "em alta": anime, animação e infantil, também só dos streamings */
+  const kidsR={
+    anime:()=>R('Animes em alta',g('tv',{...HOTP,with_genres:'16',with_original_language:'ja','air_date.gte':ago(365)},10),null),
+    animTv:()=>R('Séries animadas em alta',g('tv',{...HOTP,with_genres:'16',without_genres:'10762','with_original_language':'en|es|fr|ko|pt'},10),ci('series','top','Animation')),
+    animMv:()=>R('Animações em alta',g('movie',{...HOTP,with_genres:'16','primary_release_date.gte':ago(1460)},30),ci('movie','top','Animation',['Horror'])),
+    kids:()=>R('Infantil',g('tv',{...HOTP,with_genres:'10762'},10),null)
+  };
   const hotPages=(mt,n)=>Promise.all(Array.from({length:n},(_,i)=>tget('/discover/'+mt,{include_adult:false,sort_by:'popularity.desc','vote_count.gte':mt==='movie'?40:15,...hotP(mt),page:i+1}).catch(()=>({})))).then(js=>js.flatMap(j=>(j.results||[]).filter(r=>r.backdrop_path||r.poster_path).map(r=>normT(r,mt))));
   /* em alta hoje: o top do dia do TMDB, mas só o que está nesses streamings (e sem anime) */
   const mixTrend={type:'mix',sort0:'trend',disc:{movie:{},tv:{}},load:async()=>{
@@ -1171,7 +1178,8 @@ function buildScreens(){
     R('Séries de crime',g('tv',{with_genres:'80',without_genres:'16,35'},80),ci('series','top','Crime',['Animation','Comedy'])),
     R('Terror',g('movie',{with_genres:'27',without_genres:'35,16'}),ci('movie','top','Horror',['Comedy','Animation'])),
     R('Ficção científica',g('movie',{with_genres:'878',without_genres:'27,16'}),ci('movie','top','Sci-Fi',['Horror','Animation'])),
-    R('Anime',g('tv',{with_genres:'16',with_original_language:'ja'},50),null),
+    kidsR.anime(),kidsR.animMv(),kidsR.kids(),
+    R('Anime clássico',g('tv',{with_genres:'16',with_original_language:'ja'},50),null),
     R('Animação para a família',g('movie',{with_genres:'16,10751',without_genres:'27'}),ci('movie','top','Animation',['Horror','Thriller'])),
     R('Séries de drama',g('tv',{with_genres:'18',without_genres:'16,35,10764,10766'},80),ci('series','top','Drama',['Animation','Comedy','Reality-TV'])),
     ...addonRows()
@@ -1192,6 +1200,7 @@ function buildScreens(){
     R('Suspense',g('movie',{with_genres:'53',without_genres:'27,35,16'}),ci('movie','top','Thriller',['Horror','Comedy','Animation'])),
     R('Ficção científica',g('movie',{with_genres:'878',without_genres:'27,16'}),ci('movie','top','Sci-Fi',['Horror','Animation'])),
     R('Romance',g('movie',{with_genres:'10749',without_genres:'27,53,35'}),ci('movie','top','Romance',['Horror','Thriller','Comedy'])),
+    kidsR.animMv(),
     R('Animação',g('movie',{with_genres:'16',without_genres:'27'}),ci('movie','top','Animation',['Horror'])),
     R('Documentários',g('movie',{with_genres:'99'},50),ci('movie','top','Documentary')),
     ...addonRows('movie')
@@ -1207,7 +1216,8 @@ function buildScreens(){
     R('Crime',g('tv',{with_genres:'80',without_genres:'16,35'},80),ci('series','top','Crime',['Animation','Comedy'])),
     R('Ficção e fantasia',g('tv',{with_genres:'10765',without_genres:'16'},80),ci('series','top','Sci-Fi',['Animation'])),
     R('Mistério',g('tv',{with_genres:'9648',without_genres:'16,35'},80),ci('series','top','Mystery',['Animation','Comedy'])),
-    R('Anime',g('tv',{with_genres:'16',with_original_language:'ja'},50),null),
+    kidsR.anime(),kidsR.animTv(),kidsR.kids(),
+    R('Anime clássico',g('tv',{with_genres:'16',with_original_language:'ja'},50),null),
     R('Animação',g('tv',{with_genres:'16',with_original_language:'en'},50),ci('series','top','Animation')),
     R('Documentários',g('tv',{with_genres:'99'},30),ci('series','top','Documentary')),
     R('Reality shows',g('tv',{with_genres:'10764'},20),ci('series','top','Reality-TV')),
