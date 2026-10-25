@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="14">
+<meta name="sessao-build" content="15">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -12,7 +12,7 @@
 <style>
 :root{
   --bg:#0b0b10; --panel:#16161e; --line:#2a2a36; --text:#f4f4f6; --muted:#a2a2b0;
-  --accent:#ff5a36; --accent2:#ffb03a; --s:1;
+  --accent:#7a2cff; --accent2:#b06bff; --gold:#ffc53d; --s:1;
   --fh:Outfit,system-ui,sans-serif; --fb:Inter,system-ui,sans-serif;
   --ease:cubic-bezier(.22,.8,.24,1);
 }
@@ -30,7 +30,7 @@ img{user-select:none;-webkit-user-drag:none}
 #stage.nav-open .sideinner{transform:none}
 .brand{display:flex;align-items:center;gap:18px;margin:0 0 110px 36px;height:52px;white-space:nowrap}
 .brand b{width:48px;height:48px;border-radius:14px;flex:0 0 48px;display:grid;place-items:center;
-  background:linear-gradient(135deg,var(--accent),var(--accent2));font:800 28px var(--fh);color:#160700}
+  background:linear-gradient(135deg,var(--accent),var(--accent2));font:800 28px var(--fh);color:#fff}
 .brand span,.si span{opacity:0;transition:opacity .2s}
 .brand span{font:700 34px var(--fh);letter-spacing:-.5px}
 .si{display:flex;align-items:center;gap:24px;height:68px;margin:0 22px 8px;padding:0 20px;border-radius:14px;width:316px;
@@ -63,7 +63,7 @@ img{user-select:none;-webkit-user-drag:none}
 .hlogo h1{margin:0;font:800 74px/1 var(--fh);letter-spacing:-1.5px;text-shadow:0 4px 30px rgba(0,0,0,.6);
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .hmeta{display:flex;gap:18px;align-items:center;font:500 22px var(--fb);color:#d8d8e0;margin-bottom:16px;flex-wrap:wrap;min-height:30px}
-.hmeta .rt{color:var(--accent2);font-weight:600}
+.hmeta .rt{color:var(--gold);font-weight:600}
 .hmeta .tag{border:1.5px solid rgba(255,255,255,.4);border-radius:6px;padding:1px 9px;font-size:18px}
 .hdesc{margin:0;font:400 23px/1.5 var(--fb);color:#c9c9d3;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;min-height:103px}
 
@@ -135,7 +135,7 @@ img{user-select:none;-webkit-user-drag:none}
   font:400 20px/1.5 ui-monospace,Menlo,monospace;padding:14px 20px;resize:none;outline:none;display:block}
 .set textarea{height:130px}
 .set .focused{border-color:#fff;box-shadow:0 0 0 3px rgba(255,255,255,.25)}
-.set textarea:focus,.set input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(255,90,54,.35)}
+.set textarea:focus,.set input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(122,44,255,.4)}
 .hint{font:500 17px var(--fb);color:#7e7e8c;margin:8px 0 26px}
 .btns{display:flex;gap:18px;flex-wrap:wrap}
 .btn{height:72px;padding:0 34px;border-radius:12px;background:rgba(255,255,255,.12);display:inline-flex;align-items:center;gap:14px;
@@ -240,7 +240,7 @@ img{user-select:none;-webkit-user-drag:none}
 .plogo h2{margin:0;font:800 48px/1.05 var(--fh);text-align:center;letter-spacing:-.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .pmeta{display:flex;justify-content:space-between;align-items:center;font:600 23px var(--fb);color:#fff;margin-bottom:22px;padding:0 4px;min-height:32px}
 .pmeta .rb{display:flex;align-items:center;gap:10px}
-.pmeta .rb i{font-style:normal;font:800 14px var(--fb);background:var(--accent2);color:#1a1000;padding:3px 7px;border-radius:5px}
+.pmeta .rb i{font-style:normal;font:800 14px var(--fb);background:var(--gold);color:#1a1000;padding:3px 7px;border-radius:5px}
 .pdesc{font:400 21px/1.55 var(--fb);color:#d5d5de;margin:0 0 24px;display:-webkit-box;-webkit-line-clamp:6;-webkit-box-orient:vertical;overflow:hidden;min-height:60px}
 .plabel{font:600 16px var(--fb);letter-spacing:.08em;text-transform:uppercase;color:#8a8a98;margin:0 0 12px}
 .pchips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:24px;max-height:104px;overflow:hidden}
@@ -1660,7 +1660,7 @@ Streams.open=async(ctx)=>{
         const tags=[inf.q>=1.5&&inf.q!==1.5?h('em',{class:'q'},QTAG[Math.floor(inf.q)]):inf.q===0?h('em',{class:'q'},'CAM'):null,inf.pt===2?h('em',{class:'pt'},'PT-BR'):null,inf.dl?h('em',{class:'dl'},'baixando'):null,!direct?h('em',null,s.infoHash?'torrent':'externo'):null];
         const el=focusable(h('div',{class:'src'+(direct?'':' off')},h('div',{class:'sn'},h('span',{class:'nm'},name),...tags.filter(Boolean)),h('div',{class:'sd'},dsc)));
         el._sc=inf.score;
-        el.onEnter=()=>direct?Player.open({...ctx,url:s.url,srcName:name,srcFile:bh.filename||'',videoHash:bh.videoHash||'',videoSize:bh.videoSize||0}):toast(s.infoHash?'Torrent sem debrid precisa do servidor de streaming do Stremio. Use um addon com debrid.':'Essa fonte abre fora do app.');
+        el.onEnter=()=>direct?Player.open({...ctx,url:s.url,srcName:name,srcDesc:dsc,srcFile:bh.filename||'',videoHash:bh.videoHash||'',videoSize:bh.videoSize||0}):toast(s.infoHash?'Torrent sem debrid precisa do servidor de streaming do Stremio. Use um addon com debrid.':'Essa fonte abre fora do app.');
         /* entra já na posição certa, mantendo a melhor no topo */
         const before=$$('.src',list).find(x=>(x._sc??-1)<el._sc);
         list.insertBefore(el,before||(spin.isConnected?spin:null));got++;
@@ -1790,13 +1790,31 @@ const Player={ctx:null,hideT:null,saveT:null};
     try{
       const r=await fetch(s.url);if(!r.ok)throw 0;const buf=await r.arrayBuffer();let txt;
       try{txt=new TextDecoder('utf-8',{fatal:true}).decode(buf)}catch(e){txt=new TextDecoder('windows-1252').decode(buf)}
-      Subs.cues=parseCues(txt);Subs.cur=i;Subs.delay=0;lastCue=undefined;renderSub();
+      Subs.cues=parseCues(txt);Subs.cur=i;Subs.delay=0;lastCue=undefined;
+      const c=Subs.ctx||Player.ctx||{},vf=srcFps([c.srcFile,c.srcDesc,c.srcName].join(' '));
+      if(s.fpsMilli&&Math.abs(s.fpsMilli-vf)>300){const f=s.fpsMilli/vf;Subs.cues.forEach(q=>{q.s*=f;q.e*=f})}
+      renderSub();
       if(!Subs.cues.length)throw 0;
       if(!silent)toast('Legenda ativada.');
     }catch(e){Subs.cues=[];Subs.cur='off';if(!silent)toast('Não consegui carregar essa legenda. Tente outra.')}
   }
   const clearSubs=()=>{Subs.cues=[];Subs.cur='off';subBox.innerHTML='';lastCue=null};
   const ptRank=l=>/^(pob|ptb|pt-?br)$/i.test(l||'')?2:isPT(l)?1:0;
+  const FMT=t=>/blu-?ray|bdrip|brrip|bdremux|\bbd\b|remux/i.test(t)?'bluray':/web-?dl|webrip|\bweb\b|amzn|nf\b|dsnp|hmax|atvp|gplay|max\b/i.test(t)?'web':/dvd|xvid|divx/i.test(t)?'dvd':/hdtv|pdtv/i.test(t)?'tv':'';
+  const TOK=t=>new Set(String(t||'').toLowerCase().replace(/\.(srt|vtt|mkv|mp4|avi|sub)\b/g,' ').split(/[^a-z0-9]+/).filter(w=>w.length>2&&!/^(the|one|with|and|com|uma|s\d+e\d+|\d{1,2})$/.test(w)));
+  /* qual fps o vídeo provavelmente tem (DVD/PAL = 25, resto = 23,976) */
+  const srcFps=t=>/\bpal\b|\b25fps\b/i.test(t)||(FMT(t)==='dvd'&&!/ntsc/i.test(t))?25000:23976;
+  function subScore(sb,ctx){
+    const src=[ctx.srcFile,ctx.srcDesc,ctx.srcName].filter(Boolean).join(' ');
+    const name=[sb.subtitleFileName,sb.movieReleaseName].filter(Boolean).join(' ');
+    let sc=ptRank(sb.lang)*1000;if(!src)return sc;
+    if(sb.m==='h')sc+=500;
+    if(sb.releaseGroup&&new RegExp('\\b'+sb.releaseGroup.replace(/[^\w-]/g,'')+'\\b','i').test(src))sc+=200;
+    const a=TOK(src),b=TOK(name);let k=0;b.forEach(w=>{if(a.has(w))k++});sc+=Math.min(150,k*15);
+    const fs=FMT(src),fb=FMT((sb.releaseFormat||'')+' '+name);if(fs&&fb)sc+=fs===fb?80:-40;
+    if(sb.fpsMilli){const d=Math.abs(sb.fpsMilli-srcFps(src));sc+=d<100?40:-60}
+    return sc;
+  }
   Player.fetchSubs=async ctx=>{
     Subs.list=[];clearSubs();Subs.delay=0;const tok=++Subs.tok;
     if(ctx.test||!ctx.videoId)return;const addons=subAddons();if(!addons.length)return;
@@ -1812,9 +1830,29 @@ const Player={ctx:null,hideT:null,saveT:null};
     if(tok!==Subs.tok)return;
     /* 2) PT-BR primeiro; dentro de cada idioma vale a ordem do addon (as feitas para este arquivo vêm antes) */
     const seen=new Set();
-    Subs.list=all.flat().filter(s=>s&&s.url&&!seen.has(s.url)&&seen.add(s.url)).map((s,i)=>({...s,_o:i})).sort((a,b)=>(ptRank(b.lang)-ptRank(a.lang))||(a._o-b._o));
-    Subs.hashed=!!hs;
-    if(store.get('subAuto',true)){const i=Subs.list.findIndex(s=>isPT(s.lang));if(i>=0)loadSub(i,true)}
+    Subs.list=all.flat().filter(s=>s&&s.url&&!seen.has(s.url)&&seen.add(s.url)).map((s,i)=>{const sc=subScore(s,ctx);return {...s,_o:i,_sc:sc,_m:sc-ptRank(s.lang)*1000}}).sort((a,b)=>(b._sc-a._sc)||(a._o-b._o));
+    Subs.hashed=!!hs;Subs.ctx=ctx;
+    console.log('[legendas] hash',hs&&hs.hash,'| fonte',ctx.srcFile||ctx.srcDesc||'-','| top',Subs.list.slice(0,3).map(x=>x.lang+':'+x._sc+':'+(x.subtitleFileName||'')).join(' ; '));
+    /* 3) se o próprio arquivo tem legenda em português embutida, ela é a mais sincronizada de todas */
+    if(store.get('subAuto',true)){
+      if(await embeddedPT(tok))return;
+      const i=Subs.list.findIndex(s=>isPT(s.lang));if(i>=0)loadSub(i,true)}
+  };
+  async function embeddedPT(tok){
+    if(!NATIVE||!window.SessaoNative.textTracks)return false;
+    for(let k=0;k<8;k++){
+      let emb=[];try{emb=JSON.parse(window.SessaoNative.textTracks())}catch(e){}
+      if(tok!==Subs.tok)return true;
+      if(emb.length){
+        const pt=emb.filter(t=>isPT(t.lang)||/portugu/i.test(t.label));
+        const best=pt.find(t=>/br|brasil/i.test(t.lang+t.label)&&!/for[cç]|forced/i.test(t.label))||pt.find(t=>!/for[cç]|forced/i.test(t.label))||pt[0];
+        if(!best)return false;
+        clearSubs();Subs.cur='emb:'+best.i;window.SessaoNative.selectText(best.i);console.log('[legendas] usando a embutida',best.label);return true;
+      }
+      if(k>=1&&Eng.dur()>0)return false;
+      await new Promise(r=>setTimeout(r,1000));
+    }
+    return false;
   };
   const fmtD=d=>(d>0?'+':d<0?'−':'')+Math.abs(d).toFixed(2).replace(/\.?0+$/,'').replace(/^$/,'0')+' s';
   function syncMenu(){
@@ -1827,7 +1865,8 @@ const Player={ctx:null,hideT:null,saveT:null};
     let emb=[];if(NATIVE&&window.SessaoNative.textTracks){try{emb=JSON.parse(window.SessaoNative.textTracks())}catch(e){}}
     if(!Subs.list.length&&!emb.length){toast(subAddons().length?'Nenhuma legenda encontrada para este título.':'Entre com sua conta Stremio para usar os addons de legenda.');return}
     const cnt={};const ext=typeof Subs.cur==='number'?[['sync','Ajustar sincronia ('+(Subs.delay?fmtD(Subs.delay):'0 s')+')']]:[];
-    const opts=[['off','Desligada'],...ext,...emb.map(t=>['emb:'+t.i,t.label+' (do arquivo)']),...Subs.list.slice(0,40).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;return [i,`${l} ${cnt[l]}`]})];
+    const opts=[['off','Desligada'],...ext,...emb.map(t=>['emb:'+t.i,t.label+' (do arquivo)']),...Subs.list.slice(0,40).map((s,i)=>{const l=LANGN(s.lang)||'Legenda';cnt[l]=(cnt[l]||0)+1;const f=FMT((s.releaseFormat||'')+' '+(s.subtitleFileName||''));
+      const tag=s.m==='h'?' · mesma versão':s._m>=150?' · combina com o vídeo':f?' · '+({bluray:'Blu-ray',web:'WEB',dvd:'DVD',tv:'TV'}[f]):'';return [i,`${l} ${cnt[l]}${tag}`]})];
     Menu.open(subB,opts,Subs.cur,val=>{
       if(val==='sync'){setTimeout(syncMenu,30);return}
       if(NATIVE&&window.SessaoNative.selectText)window.SessaoNative.selectText(-1);
@@ -1874,7 +1913,7 @@ const Player={ctx:null,hideT:null,saveT:null};
     let cont=store.get('continue',[]).filter(e=>e.id!==c.metaId);
     const prog=store.get('progress',{});prog[c.videoId]={time:done?d:t,dur:d};store.set('progress',prog);
     if(!done&&t>20&&t/d<.95)cont.unshift({id:c.metaId,libId:c.libId,type:c.type,videoId:c.videoId,season:c.season,episode:c.episode,name:c.name,sub:c.sub,
-      background:c.background,poster:c.poster,description:c.description,item:c.item,url:c.url,srcName:c.srcName,time:t,dur:d,t:Date.now()});
+      background:c.background,poster:c.poster,description:c.description,item:c.item,url:c.url,srcName:c.srcName,srcFile:c.srcFile,srcDesc:c.srcDesc,time:t,dur:d,t:Date.now()});
     store.set('continue',cont.slice(0,20));
   }
   /* ---------- próximo episódio ---------- */
@@ -1923,7 +1962,7 @@ const Player={ctx:null,hideT:null,saveT:null};
   };
   Player.resume=e=>{
     const c={metaId:e.id,libId:e.libId,type:e.type,videoId:e.videoId,season:e.season,episode:e.episode,name:e.name,sub:e.sub,background:e.background,
-      poster:e.poster,description:e.description,item:e.item,time:e.time,srcName:e.srcName};
+      poster:e.poster,description:e.description,item:e.item,time:e.time,srcName:e.srcName,srcFile:e.srcFile,srcDesc:e.srcDesc};
     if(e.url)Player.open({...c,url:e.url});
     else if(e.videoId)Streams.open(c);
     else Detail.open(e.item||{id:e.id,type:e.type,name:e.name,background:e.background,poster:e.poster});
