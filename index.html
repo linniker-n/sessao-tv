@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="23">
+<meta name="sessao-build" content="24">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -2111,7 +2111,12 @@ function back(){
 }
 window.__onBack=()=>{const r=back();if(r)sfx('ok');return r};
 /* o app da TV baixou uma versão nova da interface: recarrega se a pessoa não estiver assistindo nada */
-window.__updateReady=()=>{if(Layers.top()||Player.ctx)return false;toast('Sessão atualizado. Recarregando...');setTimeout(()=>location.reload(),1500);return true};
+/* se a pessoa estiver navegando ou assistindo, a versão nova espera um momento parado (sem player, sem tela aberta, 20 s sem apertar nada) */
+let lastKeyAt=Date.now(),updWait=false;
+addEventListener('keydown',()=>{lastKeyAt=Date.now()},true);
+const updNow=()=>{toast('Sessão atualizado. Recarregando...');setTimeout(()=>location.reload(),1500)};
+window.__updateReady=()=>{if(Layers.top()||Player.ctx||Date.now()-lastKeyAt<20000){updWait=true;return true}updNow();return true};
+setInterval(()=>{if(updWait&&!Layers.top()&&!Player.ctx&&Date.now()-lastKeyAt>20000){updWait=false;updNow()}},5000);
 /* botão voltar do navegador e do mouse */
 try{history.pushState({sessao:1},'')}catch(e){}
 addEventListener('popstate',()=>{back();try{history.pushState({sessao:1},'')}catch(e){}});
