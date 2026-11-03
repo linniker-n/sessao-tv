@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=1920, height=1080">
 <title>Sessão TV</title>
-<meta name="sessao-build" content="24">
+<meta name="sessao-build" content="25">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://image.tmdb.org" crossorigin>
 <link rel="preconnect" href="https://api.themoviedb.org" crossorigin>
@@ -181,7 +181,8 @@ img{user-select:none;-webkit-user-drag:none}
 .src{border-radius:14px;background:#1a1a23;padding:18px 24px;cursor:pointer}
 .src .sn{font:600 22px var(--fh);color:#fff;margin-bottom:6px;display:flex;gap:10px;align-items:center}
 .src .sn em{font-style:normal;font-size:15px;background:var(--accent);color:#fff;border-radius:5px;padding:1px 8px}
-.src .sn em.q{background:#e9e9ef;color:#111}.src .sn em.pt{background:#1f9d55;color:#fff}.src .sn em.dl{background:#555}
+.src .sn em.q{background:#e9e9ef;color:#111}.src .sn em.pt{background:#1f9d55;color:#fff}.src .sn em.pt.ok{background:#14b85a}
+.src.chk .sn::after{content:"conferindo áudio…";font:500 14px var(--fb);color:var(--muted)}.src .sn em.dl{background:#555}
 .src .sn .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .src .sd{font:400 18px/1.45 var(--fb);color:#a5a5b2;white-space:pre-line;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .src.off{opacity:.45}
@@ -656,7 +657,10 @@ function discParams(mt,sort,def){
   return p;
 }
 /* escolhe a fonte certa para fileira / ver tudo, com tipo e ordenação */
+const GRP={};
 function makePager(def,o={}){
+  if(o.row&&def.t&&def.t.grp){const gk=o.row+':'+def.t.grp,set=GRP[gk]=GRP[gk]||new Set(),p=makePager(def,{});
+    return {ok:p.ok,get done(){return p.done},async next(){return (await p.next()).filter(it=>!set.has(it.id)&&set.add(it.id))}}}
   if(def.a){const base=dedupe(addonPager(def)),sort=o.sort||'trend';return sort==='trend'?base:dedupe(staticPager(async()=>(await drain(base,5)).sort(CMP[sort])))}
   if(MODE==='tmdb'&&def.t&&def.t.load){
     const t=def.t,sort=o.sort||'trend',ty=o.type&&o.type!=='all'?(o.type==='tv'?'series':'movie'):null;
@@ -1081,7 +1085,7 @@ function RowsScreen(root,defs){
   scr.load=async()=>{
     if(scr.loaded)return;scr.loaded=true;
     scr.refreshSpecial();
-    const list=defs.filter(d=>!d.special).map(d=>({d,p:makePager(d)})).filter(x=>x.p.ok);
+    const list=defs.filter(d=>!d.special).map(d=>({d,p:makePager(d,{row:root.id})})).filter(x=>x.p.ok);
     const ph=list.map(x=>{const r=addRow(x.d.title,[]);const t=$('.track',r);for(let i=0;i<6;i++)t.append(h('div',{class:'card skel'}));return r});
     let heroSet=false;
     await Promise.all(list.map(async(x,i)=>{
@@ -1175,14 +1179,36 @@ function buildScreens(){
   }};
   const mixBR={type:'mix',sort0:'trend',disc:{movie:{with_origin_country:'BR'},tv:{with_origin_country:'BR'}},min:{movie:30,tv:10}};
   /* catálogos por streaming no Brasil (TMDB, onde cada título está disponível) */
-  const SV=[['Netflix','8'],['Disney+','337'],['Prime Video','119'],['Max','1899|384'],['Apple TV+','350'],['Globoplay','307'],['Paramount+','531']];
-  const svRows=types=>SV.flatMap(([n,id])=>types.map(mt=>R(`${n} · ${mt==='movie'?'Filmes':'Séries'}`,g(mt,{with_watch_providers:id,watch_region:'BR'},mt==='movie'?40:15),null)));
+  const SV=[['Netflix','8','213'],['Disney+','337','2739'],['Prime Video','119','1024'],['Max','1899|384','49|3186|6783'],['Apple TV+','350','2552'],['Globoplay','307',null],['Paramount+','531','4330']];
+  const NOSHOW='16,10762,10763,10767';
+  const svTv=(pid,net)=>({...(net?g('tv',{with_networks:net,'air_date.gte':ago(180),without_genres:NOSHOW},5)
+      :g('tv',{with_watch_providers:pid,watch_region:'BR',with_watch_monetization_types:'flatrate',with_origin_country:'BR','air_date.gte':ago(365),without_genres:NOSHOW},3)),grp:'sv-tv'});
+  const svMv=pid=>({...g('movie',{with_watch_providers:pid,watch_region:'BR',with_watch_monetization_types:'flatrate','primary_release_date.gte':ago(pid==='307'?900:540),without_genres:'16'},20),grp:'sv-movie'});
+  const svRows=types=>SV.flatMap(([n,pid,net])=>types.map(mt=>R(`${n} · ${mt==='movie'?'Filmes':'Séries'}`,mt==='movie'?svMv(pid):svTv(pid,net),null)));
+  /* em alta hoje de verdade: ranking diário do TMDB, ficando só o que está na assinatura dos streamings famosos no Brasil */
+  const BIG=/netflix|disney|prime video|amazon|\bmax\b|hbo|apple tv|globoplay|paramount/i;
+  const trendSt=mt=>async()=>{
+    const ck='trend2:'+mt,c=store.get(ck,null);if(c&&Date.now()-c.t<3*3600e3&&c.items.length)return c.items;
+    const out=[],seen=new Set();
+    for(const win of ['day','week']){
+      const js=await Promise.all([1,2,3,4].map(page=>tget(`/trending/${mt}/${win}`,{page}).catch(()=>({}))));
+      const cand=js.flatMap(j=>j.results||[]).filter(r=>!seen.has(r.id)&&seen.add(r.id)&&!(r.genre_ids||[]).includes(16)&&(r.backdrop_path||r.poster_path)).slice(0,60);
+      for(let i=0;i<cand.length&&out.length<24;i+=8){
+        const ok=await Promise.all(cand.slice(i,i+8).map(r=>tget(`/${mt}/${r.id}/watch/providers`).then(w=>{const br=(w.results||{}).BR||{};return (br.flatrate||[]).some(p=>BIG.test(p.provider_name||''))}).catch(()=>false)));
+        cand.slice(i,i+8).forEach((r,k)=>{if(ok.at(k)&&out.length<24)out.push(normT(r,mt))});
+      }
+      if(out.length>=12)break;
+    }
+    if(out.length)store.set(ck,{t:Date.now(),items:out});
+    return out;
+  };
+  const trendRow=(mt,title)=>R(title,{type:mt,sort0:'trend',disc:{[mt]:{}},load:trendSt(mt)},ci(mt==='movie'?'movie':'series','top'));
+  const svPairs=()=>SV.flatMap(([n,pid,net])=>[R(`${n} · Séries`,svTv(pid,net),null),R(`${n} · Filmes`,svMv(pid),null)]);
   Screens.map.home=RowsScreen($('#s-home'),[
     {special:'continue'},
-    R('Filmes em alta',hot('movie'),ci('movie','top')),
-    R('Séries em alta',hot('tv'),ci('series','top')),
-    ...svRows(['movie','tv']),
-    R('Em alta hoje',mixTrend,null),
+    trendRow('movie','Filmes em alta hoje'),
+    trendRow('tv','Séries em alta hoje'),
+    ...svPairs(),
     R('Produções brasileiras',mixBR,null),
     R('Aclamados pela crítica',top('movie'),ci('movie','imdbRating')),
     R('Ação e aventura',g('movie',{with_genres:'28|12',without_genres:'16,27,10751'}),ci('movie','top','Action',['Animation','Horror','Family'])),
@@ -1198,7 +1224,7 @@ function buildScreens(){
   ]);
   Screens.map.home.onShow=()=>{const s=Screens.map.home;if(s.loaded)s.refreshSpecial()};
   Screens.map.movies=RowsScreen($('#s-movies'),[
-    R('Filmes em alta',hot('movie'),ci('movie','top')),
+    trendRow('movie','Filmes em alta hoje'),
     ...svRows(['movie']),
     R('Nos cinemas',{type:'movie',path:'/movie/now_playing',params:{region:'BR'},sort0:'recent',disc:{movie:{}}},{type:'movie',cat:'year',extra:'genre='+Y}),
     R('Aclamados pela crítica',top('movie'),ci('movie','imdbRating')),
@@ -1218,7 +1244,7 @@ function buildScreens(){
     ...addonRows('movie')
   ]);
   Screens.map.series=RowsScreen($('#s-series'),[
-    R('Séries em alta',hot('tv'),ci('series','top')),
+    trendRow('tv','Séries em alta hoje'),
     ...svRows(['tv']),
     R('No ar agora',{type:'tv',path:'/tv/on_the_air',sort0:'recent',disc:{tv:{}}},{type:'series',cat:'year',extra:'genre='+Y}),
     R('Aclamadas pela crítica',top('tv'),ci('series','imdbRating')),
@@ -1680,22 +1706,67 @@ function alignSubs(e,t0,step,cues){
   if(best)best.ok=(best.z>=3.5&&best.ratio>=1.12)||(best.z>=2.5&&best.ratio>=1.5);
   return best;
 }
-const Streams={ctx:null,tok:0};
+const Streams={ctx:null,tok:0,probeQ:[],probing:0,probeN:0,probeMap:{}};
 /* nota de cada fonte: link direto > áudio PT-BR > qualidade (4K > 1080p > 720p > 480p) > já em cache */
 function streamInfo(s){
   const bh=s.behaviorHints||{};const txt=[s.name,s.title,s.description,bh.filename].filter(Boolean).join(' ');
   const q=/\b(cam|hdcam|hd-?ts|telesync|ts|tc)\b/i.test(txt)?0:/\b(2160p|4k|uhd)\b/i.test(txt)?4:/\b(1080p|1080i|fhd|full ?hd)\b/i.test(txt)?3:/\b(720p|hd)\b/i.test(txt)?2:/\b(480p|576p|sd|360p)\b/i.test(txt)?1:1.5;
-  const pt=/🇧🇷|\bpt-?br\b|portugu|dublad|\bdub\b|\bdual(\b|[ ._-]?(audio|áudio))|\bnacional\b|\bbrazil|\bbr-?dub/i.test(txt)?2:/🇵🇹|\bpor\b|\bmulti([ ._-]?(audio|áudio|lang))?\b/i.test(txt)?1:0;
+  /* áudio em português: "dublado/nacional" é forte; "dual/multi/pt-br" sozinho é fraco (pode ser só legenda ou outro idioma) */
+  const dub=/dublad|\bdub\b|\bnacional\b|\bbr-?dub|🇧🇷/i.test(txt),ptLang=/🇵🇹|portugu[eê]s|\bpt-?br\b|\bpor\b|\bbrazil/i.test(txt);
+  const multi=/\bdual(\b|[ ._-]?(audio|áudio))|\bmulti([ ._-]?(audio|áudio|lang))?\b/i.test(txt),onlySub=/legendad|\bleg\b|\bsubs?\b(?!.*(dual|dub))/i.test(txt)&&!dub&&!multi;
+  const pt=onlySub?0:dub||(ptLang&&multi)?2:ptLang||multi?1:0;
   const dl=/\[(rd|ad|pm|dl|tb|ed|oc)\s*download\]|⬇️|\buncached\b/i.test(s.name||'');
-  return {q,pt,dl,score:(s.url?10000:0)+pt*1000+q*100-(dl?450:0)};
+  return {q,pt,dl,score:streamScore(!!s.url,pt,q,dl)};
 }
 const QTAG=['CAM','SD','HD','Full HD','4K'];
+/* nota: link direto > áudio PT confirmado no arquivo (3) > dublado no nome (2) > talvez (1) > sem PT (0) > qualidade */
+const streamScore=(direct,pt,q,dl)=>(direct?10000:0)+pt*1000+q*100-(dl?450:0);
+const PTA=/^(por|pt|pob|ptb|pt-br|pt_br|portuguese|português|portugues)$/i;
+/* confere de verdade as faixas de áudio das melhores fontes (app da TV 1.3+), sem tocar o vídeo */
+function probeSources(list,tok){
+  const B=window.SessaoNative;if(!(B&&B.probeAudio))return;
+  clearTimeout(Streams.probeT);Streams.probeT=setTimeout(()=>{
+    if(tok!==Streams.tok)return;
+    const cand=$$('.src',list).filter(e=>e._url&&!e._dl&&!e._probed).slice(0,14);
+    cand.forEach(e=>{e._probed=true;Streams.probeQ.push(e)});runProbes(list,tok);
+  },400);
+}
+function runProbes(list,tok){
+  const B=window.SessaoNative;
+  while(Streams.probing<3&&Streams.probeQ.length){
+    const e=Streams.probeQ.shift();if(tok!==Streams.tok||!e.isConnected)continue;
+    Streams.probing++;const id='p'+(++Streams.probeN);Streams.probeMap[id]=e;
+    e.classList.add('chk');
+    const done=()=>{if(!Streams.probeMap[id])return;delete Streams.probeMap[id];Streams.probing--;e.classList.remove('chk');runProbes(list,tok)};
+    setTimeout(done,12000);e._done=done;
+    try{B.probeAudio(id,e._url)}catch(x){done()}
+  }
+}
+window.__probe=(id,r)=>{
+  const e=Streams.probeMap[id];if(!e)return;const d=e._done;
+  if(r&&r.ok&&r.audio&&r.audio.length){
+    const langs=r.audio.map(a=>String(a.lang||'').toLowerCase());
+    const hasPT=langs.some(l=>PTA.test(l)),known=langs.filter(l=>l&&l!=='und'&&l!=='unknown').length;
+    if(hasPT)e._pt=3;else if(known)e._pt=0;
+    paintPT(e);
+  }
+  d&&d();
+  const list=e.parentElement;if(!list)return;
+  e._sc=streamScore(true,e._pt,e._q,e._dl);
+  if(!Streams.moved){const els=$$('.src',list).filter(x=>x._sc!=null).sort((a,b)=>b._sc-a._sc);const anchor=list.querySelector('.spin,.msg,.src.demo');
+    els.forEach(x=>list.insertBefore(x,anchor));
+    const top=$$('.src',list)[0];if(Layers.is('streams')&&top){Streams.pf=top;Nav.focus(top)}}
+};
+function paintPT(e){
+  const sn=e.querySelector('.sn');$$('em.pt',sn).forEach(x=>x.remove());
+  if(e._pt>=2){const t=h('em',{class:'pt'+(e._pt===3?' ok':'')},e._pt===3?'PT-BR ✓':'PT-BR');const q=sn.querySelector('em.q');q?q.after(t):sn.querySelector('.nm').after(t)}
+}
 Streams.open=async(ctx)=>{
-  Streams.ctx=ctx;const tok=++Streams.tok;Streams.moved=false;Streams.pf=null;Layers.push('streams');
+  Streams.ctx=ctx;const tok=++Streams.tok;Streams.moved=false;Streams.pf=null;Streams.probeQ=[];Streams.probing=0;Streams.probeMap={};Layers.push('streams');
   const lay=$('#streams'),list=$('.slist',lay);$('.sub',lay).textContent=ctx.name+(ctx.sub?' · '+ctx.sub:'');
   list.innerHTML='';list.style.transform='';
   const addons=streamAddons();
-  const demoBtn=()=>focusable(h('div',{class:'src'},h('div',{class:'sn'},'Vídeo de demonstração'),h('div',{class:'sd'},'Testa o player com um curta aberto (Big Buck Bunny).')),
+  const demoBtn=()=>focusable(h('div',{class:'src demo'},h('div',{class:'sn'},'Vídeo de demonstração'),h('div',{class:'sd'},'Testa o player com um curta aberto (Big Buck Bunny).')),
     ()=>Player.open({...ctx,url:DEMO_VIDEO.url,test:true}));
   if(!addons.length){
     list.append(h('div',{class:'msg'},'Nenhum addon de streams ainda. Vá em Ajustes e entre com sua conta Stremio para importar os seus addons.'));
@@ -1714,13 +1785,14 @@ Streams.open=async(ctx)=>{
         const direct=!!s.url,name=(s.name||'Fonte').replace(/\n/g,' '),dsc=s.description||s.title||'',inf=streamInfo(s),bh=s.behaviorHints||{};
         const tags=[inf.q>=1.5&&inf.q!==1.5?h('em',{class:'q'},QTAG[Math.floor(inf.q)]):inf.q===0?h('em',{class:'q'},'CAM'):null,inf.pt===2?h('em',{class:'pt'},'PT-BR'):null,inf.dl?h('em',{class:'dl'},'baixando'):null,!direct?h('em',null,s.infoHash?'torrent':'externo'):null];
         const el=focusable(h('div',{class:'src'+(direct?'':' off')},h('div',{class:'sn'},h('span',{class:'nm'},name),...tags.filter(Boolean)),h('div',{class:'sd'},dsc)));
-        el._sc=inf.score;
+        el._sc=inf.score;el._pt=inf.pt;el._q=inf.q;el._dl=inf.dl;el._url=direct?s.url:null;
         el.onEnter=()=>direct?Player.open({...ctx,url:s.url,srcName:name,srcDesc:dsc,srcFile:bh.filename||'',videoHash:bh.videoHash||'',videoSize:bh.videoSize||0}):toast(s.infoHash?'Torrent sem debrid precisa do servidor de streaming do Stremio. Use um addon com debrid.':'Essa fonte abre fora do app.');
         /* entra já na posição certa, mantendo a melhor no topo */
         const before=$$('.src',list).find(x=>(x._sc??-1)<el._sc);
         list.insertBefore(el,before||(spin.isConnected?spin:null));got++;
         if(Layers.is('streams')&&(got===1||!Streams.moved)){Streams.pf=list.querySelector('.src');Nav.focus(Streams.pf)}
       });
+      probeSources(list,tok);
     }catch(e){}
     if(--pending===0&&tok===Streams.tok){
       spin.remove();
